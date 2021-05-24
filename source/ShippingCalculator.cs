@@ -27,25 +27,44 @@ namespace ShippingQuote
             this.UpsService = upsService;
         }
 
-        public decimal FindBestShippingDeal(string fromAddress, string toAddress, List<Measurement> dimensions)
+        public KeyValuePair<string, decimal> FindBestShippingDeal(AddressInfo fromAddress, AddressInfo toAddress, List<Measurement> measurements)
         {
-            var tasks = new List<Task<decimal>>();
+            if (fromAddress == null || toAddress == null || measurements == null)
+            {
+                throw new ArgumentNullException("Invalid input data. From and To addresses and Measurements should not be null.");
+            }
+
+            if (!measurements.Any())
+            {
+                throw new ArgumentException("At least one package measurement is expected");
+            }
+            // should exlude negative measurements?
+
+            var fullFromAddress = fromAddress.GetFullAddress();
+            var fullToAddress = toAddress.GetFullAddress();
+
+            if (string.IsNullOrWhiteSpace(fullFromAddress) || string.IsNullOrWhiteSpace(fullToAddress))
+            {
+                throw new ArgumentException("Invaid input data. From or To addresses are empty");
+            }
+            // in reality the key should be an ID of the carrier, not a string name
+            var tasks = new Dictionary<string, Task<decimal>>();
             //fedex
-            var fedexInfo = this.Carriers.Fedex;
-            var dimensionsInFedexMeasurementSystem = dimensions.Select(d => d.ConvertTo(fedexInfo.MeasurementSystem));
-            tasks.Add(this.FedexService.GetTotal(new Fedex(fromAddress, toAddress, dimensionsInFedexMeasurementSystem.Select(d => new Package(d.Height, d.Width, d.Length)).ToList())));
+            var dimensionsInFedexMeasurementSystem = measurements.Select(d => d.ConvertTo(this.Carriers.Fedex.MeasurementSystem));
+            var fedexTask = this.FedexService.GetTotal(new Fedex(fullFromAddress, fullToAddress, dimensionsInFedexMeasurementSystem.Select(d => new float[] { d.Height, d.Width, d.Length }).ToList()));
+            tasks.Add("fedex", fedexTask);
             //canadaPost
-            var canadaPostInfo = this.Carriers.CanadaPost;
-            var dimensionsInCanadaPostMeasurementSystem = dimensions.Select(d => d.ConvertTo(canadaPostInfo.MeasurementSystem));
-            tasks.Add(this.CanadaPostService.GetTotal(new CanadaPost(fromAddress, toAddress, dimensionsInCanadaPostMeasurementSystem.Select(d => new Package(d.Height, d.Width, d.Length)).ToList())));
+            var dimensionsInCanadaPostMeasurementSystem = measurements.Select(d => d.ConvertTo(this.Carriers.CanadaPost.MeasurementSystem));
+            var canadaPostTask = this.CanadaPostService.GetTotal(new CanadaPost(fullFromAddress, fullToAddress, dimensionsInCanadaPostMeasurementSystem.Select(d => new float[] { d.Height, d.Width, d.Length }).ToList()));
+            tasks.Add("canadaPost", canadaPostTask);
             //UPS
-            var upsInfo = this.Carriers.Ups;
-            var dimensionsInUpsMeasurementSystem = dimensions.Select(d => d.ConvertTo(upsInfo.MeasurementSystem));
-            tasks.Add(this.UpsService.GetTotal(new Ups(fromAddress, toAddress, dimensionsInUpsMeasurementSystem.Select(d => new Package(d.Height, d.Width, d.Length)).ToList())));
+            var dimensionsInUpsMeasurementSystem = measurements.Select(d => d.ConvertTo(this.Carriers.Ups.MeasurementSystem));
+            var upsTask = this.UpsService.GetTotal(new Ups(fullFromAddress, fullToAddress, dimensionsInUpsMeasurementSystem.Select(d => new Package(d.Height, d.Width, d.Length)).ToList()));
+            tasks.Add("ups", upsTask);
             
             try
             {
-                Task.WaitAll(tasks.ToArray());
+                Task.WaitAll(tasks.Values.ToArray());
             }
             catch (AggregateException e)
             {
@@ -54,13 +73,13 @@ namespace ShippingQuote
                     _logger.LogError(e.InnerExceptions[i], "Failed to call one of the external API");
                 }
             }
-            var results = tasks.Where(t => t.IsCompletedSuccessfully).Select(t => t.Result).Select(r => r).ToList();
+            var results = tasks.Where(t => t.Value.IsCompletedSuccessfully).Select(t => new KeyValuePair<string, decimal>(t.Key, t.Value.Result));
             if (results.Any())
             {
-                return results.Min();
+                return results.OrderBy(kvp => kvp.Value).First();
             }
             _logger.LogCritical("Not a single API returned Success. The best deal is -1$");
-            return -1;
+            return new KeyValuePair<string, decimal>(string.Empty, -1);
         }
     }
 }

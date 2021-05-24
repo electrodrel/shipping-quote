@@ -5,6 +5,6 @@ namespace ShippingQuote
 {
     public interface IShippingCalculator
     {
-        decimal FindBestShippingDeal(string fromAddress, string toAddress, List<Measurement> dimensions);
+        KeyValuePair<string, decimal> FindBestShippingDeal(AddressInfo fromAddress, AddressInfo toAddress, List<Measurement> dimensions);
     }
 }

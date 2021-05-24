@@ -18,13 +18,20 @@ namespace ShippingQuote
         static async Task Main(string[] args)
         {
             using IHost host = CreateHostBuilder(args).Build();
+            var logger = host.Services.GetRequiredService<ILogger<Program>>();
+            try
+            {
+                var shippingCalculator = host.Services.GetRequiredService<IShippingCalculator>();
+                // in reality this will be a web call to our host or a message bus event to handle
+                var result = shippingCalculator.FindBestShippingDeal(new AddressInfo("Barnaby", "BC", "Canada"), new AddressInfo("Winnipeg", "MB", "Canada"), new List<Measurement>() { new Measurement(10, 10, 20, MeasurementSystem.MetricCentimetre) });
+                Console.WriteLine(result);
 
-            var shippingCalculator = host.Services.GetRequiredService<IShippingCalculator>();
-            // in reality this will be a web call to our host or a message bus event to handle
-            var result = shippingCalculator.FindBestShippingDeal("Barnaby, BC, Canada", "Winnipeg, MB, Canada", new List<Measurement>() { new Measurement(10, 10, 20, MeasurementSystem.MetricCentimetre) });
-            Console.WriteLine(result);
-
-            await host.RunAsync();
+                await host.RunAsync();
+            }
+            catch (System.Exception e)
+            {
+                logger.LogError(e, e.Message);
+            }
         }
 
         static IHostBuilder CreateHostBuilder(string[] args)
