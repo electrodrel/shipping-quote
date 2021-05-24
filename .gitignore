@@ -1,0 +1,10 @@
+*.user
+*.suo
+*.rsuser
+.vs/
+.vscode/
+bin/
+lib/
+obj/
+*.orig
+*.TMP
