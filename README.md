@@ -8,7 +8,7 @@ Make sure you have .Net 5.0 installed on your local machine
 
 ## General Comments
 
-I could have written a simple Console App with no IHost running in the back, but I wanted to make use of the build-in IHost dependency injection as well as the ConfigurationBuilder.
+I could have written a simple Console App with no `IHost` running in the back, but I wanted to make use of the build-in IHost dependency injection as well as the ConfigurationBuilder.
 Also, in a real application, such subsystem most likely won't be a exe console app, it would be a win service processing incoming messages to find the best deal. It can techinically be a library, but typically there is still a system between client library and external APIs (an internal API or asynchronous messaging system)
 
 From the assigniment it wasn't clear what the format of each box dimension is. I parse it to the simple float array for two JSON Api, and a `Package` object for the third one.
